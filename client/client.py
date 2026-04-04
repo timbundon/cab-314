@@ -229,7 +229,7 @@ class Utillity():
                 style &= ~WS_EX_APPWINDOW
                 ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
 
-BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) or '__compiled__' in globals() else os.path.dirname(__file__)
 IP_CONFIGURATION = IpConfiguration("Radmin", r"Software\cab-314")
 WINDOW_MANAGER = WindowManager()
 ACTION_REALISATIONS = ActionRealisations()

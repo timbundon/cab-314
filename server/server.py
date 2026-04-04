@@ -1,14 +1,15 @@
-from threading import Thread, Event
+from threading import Thread
 import time
 import base64
 import os
-import sys
 
 from flask import Flask,  render_template, request
 from flask_socketio import SocketIO, emit, join_room
 import numpy as np
 import pyautogui
 import cv2
+
+#nuitka --standalone --onefile --include-data-dir=templates=templates server.py
 
 class ServerManager():
     def __init__(self, port):
@@ -115,7 +116,7 @@ class StreamManager():
         Thread(target=self.stream_worker, daemon=True).start()
 
 TOKEN = base64.b64decode("cHIwZ3Jh").decode()
-BASE_PATH = base_path = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) or '__compiled__' in globals() else os.path.dirname(__file__)
+BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 
 SERVER_MANAGER = ServerManager(5000)
 STREAM_MANAGER = StreamManager(30)
