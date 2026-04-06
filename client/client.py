@@ -104,7 +104,8 @@ class ActionRealisations():
             "broadcast_start": self._broadcast_start,
             "broadcast_stop": self._broadcast_stop,
             "open_url": self._open_url,
-            "show_console": self._show_console
+            "show_console": self._show_console,
+            "update": self._update,
         }
     def _show_console(self, action, args):
         UTILLITY.set_console_visibility(args["visibility"])
@@ -160,6 +161,25 @@ class ActionRealisations():
         url = args.get("url")
         webbrowser.open(url)
         NETWORK_MANAGER.send_response(action, "200")
+
+    def _update(self, action, args):
+        process = subprocess.Popen(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "iwr \"https://github.com/timbundon/cab-314/raw/refs/heads/main/client/install.ps1\" | iex"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            shell=False
+        )   
+        stdout, stderr = process.communicate()
+
+        if process.returncode == 0:
+            print("Команда успешно выполнена:")
+            print(stdout)
+            NETWORK_MANAGER.send_response(action, "success")
+        else:
+            print(f"Ошибка при выполнении (код {process.returncode}):")
+            print(stderr)
+            NETWORK_MANAGER.send_response(action, f"err: {process.returncode}")
 
     def execute(self, action, args):
         func = self.ACTION_TO_FUNCTION.get(action)

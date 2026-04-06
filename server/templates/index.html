@@ -155,6 +155,16 @@
                 </div>
             </div>
 
+            <div class="cmd-card">
+                <button class="btn-toggle" onclick="toggleCard(this)">🔄 Обновление ПО <span>▼</span></button>
+                <div class="args-panel">
+                    <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">
+                        Отправить команду на обновление клиентского приложения.
+                    </p>
+                    <button class="btn-send" onclick="handleCommand('update')">Запустить обновление</button>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -312,6 +322,9 @@
                 return alert("Введите полную ссылку (с http:// или https://)");
             }
             args = { url: url.trim() };
+        }
+        else if (action === 'update') {
+            if(!confirm("Вы уверены, что хотите обновить клиент на стороне ученика?")) return;
         }
 
         socket.emit('send_command', { target, action, args });
