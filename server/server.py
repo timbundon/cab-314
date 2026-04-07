@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 import ctypes
 
-from flask import Flask,  render_template, request
+from flask import Flask,  render_template, request, redirect
 from flask_socketio import SocketIO, emit, join_room
 import numpy as np
 import pyautogui
@@ -84,6 +84,7 @@ class ServerManager():
         @self.app.route("/toogle_console")
         def t():
             toogle_console()
+            return redirect("/")
         
     def setup_socket_server(self):
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")
@@ -128,6 +129,7 @@ class ServerManager():
         @self.socketio.on("client_response")
         def handle_response(response_data):
             sender = response_data["sender"]
+            response_data["sid"] = request.sid
             response_data["time"] = datetime.now().strftime("%H:%M:%S")
             self.logs.append(response_data)
             self.socketio.emit("display_result", response_data, to=sender)
