@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teacher Panel - Professional</title>
+    <title>Admin Panel v2.2</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root {
@@ -13,10 +13,9 @@
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        /* Стили окна авторизации */
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--bg); z-index: 9999;
+            background: var(--bg); z-index: 10000;
             display: flex; justify-content: center; align-items: center;
         }
         .auth-box {
@@ -33,6 +32,54 @@
         .btn-all { background: var(--accent); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 15px; font-weight: bold; width: 100%; }
 
         #main { flex: 1; padding: 20px; overflow-y: auto; border-right: 1px solid var(--border); }
+        
+        #monitoring-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        #monitoring-count { font-size: 0.8rem; color: #64748b; font-weight: normal; }
+
+        /* --- ОБНОВЛЕННАЯ СЕТКА (Hyprland style) --- */
+        #video-monitoring { 
+            background: #1e293b; border-radius: 12px; padding: 10px; 
+            margin-bottom: 20px; min-height: 100px; 
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            grid-auto-rows: min-content;
+            gap: 10px;
+            border: 2px solid #334155; box-sizing: border-box;
+        }
+        .stream-window { 
+            background: #000; border-radius: 6px; border: 1px solid #475569; 
+            overflow: hidden; position: relative; aspect-ratio: 16/9;
+            transition: all 0.3s ease;
+            cursor: grab;
+        }
+        .stream-window:active { cursor: grabbing; }
+        .stream-window.dragging { opacity: 0.4; border: 2px dashed var(--accent); }
+        .stream-window.over { border: 2px solid var(--primary); transform: scale(1.02); }
+
+        .stream-img { width: 100%; height: 100%; display: block; background: #000; object-fit: contain; pointer-events: none;}
+        .stream-meta { 
+            position: absolute; bottom: 0; left: 0; width: 100%; 
+            background: rgba(0,0,0,0.7); color: #fff; padding: 4px 8px; 
+            font-size: 0.75rem; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center;
+        }
+        .stream-actions { display: flex; gap: 5px; }
+        
+        .btn-stream-action { 
+            background: rgba(255,255,255,0.2); border: none; color: #fff; 
+            border-radius: 4px; cursor: pointer; padding: 2px 6px; font-size: 0.7rem; 
+            transition: background 0.2s;
+        }
+        .btn-stream-action:hover { background: rgba(255,255,255,0.4); }
+        .btn-stream-action.close:hover { background: rgba(225,29,72,0.8); }
+
+        .stream-window.maximized {
+            position: fixed; top: 5%; left: 5%; width: 90vw; height: 90vh;
+            z-index: 9999; border: 2px solid var(--primary);
+            box-shadow: 0 0 0 100vmax rgba(0,0,0,0.8);
+            display: flex; flex-direction: column; border-radius: 12px;
+        }
+        .stream-window.maximized .stream-img { height: 100%; }
+
         .commands-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
         .cmd-card { background: var(--panel); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; height: fit-content; }
         .btn-toggle { width: 100%; padding: 12px 15px; background: #fff; border: none; text-align: left; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
@@ -44,13 +91,15 @@
         .btn-danger { background: var(--danger); margin-top: 5px; }
         
         #results-panel { width: 400px; background: var(--panel); display: flex; flex-direction: column; }
-        .res-header { padding: 15px; background: #1e293b; color: white; font-weight: bold; }
+        .res-header { padding: 15px; background: #1e293b; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .btn-clear-log { background: rgba(255,255,255,0.1); border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
         #results-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
         .res-card { padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 0.85rem; }
         .res-card.error { border-left: 4px solid var(--danger); }
         .res-card.success { border-left: 4px solid var(--success); }
         .res-img { width: 100%; border-radius: 4px; margin-top: 8px; cursor: pointer; border: 1px solid #ddd; }
         .file-label { display: block; font-size: 0.75rem; margin-bottom: 5px; color: #64748b; font-weight: 600; }
+        .ip-item .sid-hint { font-size: 0.7rem; color: #94a3b8; display: block; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -72,12 +121,19 @@
 
     <div id="main">
         <h2 id="target-display">Цель не выбрана</h2>
-        <div class="commands-grid">
+        
+        <h3 id="monitoring-header">
+            🖥️ Мониторинг экранов
+            <span id="monitoring-count">Активных окон: 0</span>
+        </h3>
+        <div id="video-monitoring"></div>
 
+        <div class="commands-grid">
             <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">📸 Экран ученика <span>▼</span></button>
+                <button class="btn-toggle" onclick="toggleCard(this)">🖥️ Мониторинг (Экран ученика) <span>▼</span></button>
                 <div class="args-panel">
-                    <button class="btn-send" onclick="handleCommand('screenshot')">Получить скриншот</button>
+                    <button class="btn-send" onclick="handleCommand('get_student_stream_start')">Начать трансляцию</button>
+                    <button class="btn-send btn-danger" style="margin-top:8px" onclick="handleCommand('get_student_stream_stop')">Остановить</button>
                 </div>
             </div>
 
@@ -131,11 +187,11 @@
             <div class="cmd-card">
                 <button class="btn-toggle" onclick="toggleCard(this)">📥 Сбор работ <span>▼</span></button>
                 <div class="args-panel">
-                    <span class="file-label">Название сбора (например: Лаб_1)</span>
                     <input type="text" id="collect-name" placeholder="Папка для сохранения">
                     <button class="btn-send" style="background: #10b981;" onclick="handleCommand('collect_files')">Запросить файлы</button>
                 </div>
             </div>
+
             <div class="cmd-card">
                 <button class="btn-toggle" onclick="toggleCard(this)">🌐 Открыть ссылку <span>▼</span></button>
                 <div class="args-panel">
@@ -158,226 +214,214 @@
             <div class="cmd-card">
                 <button class="btn-toggle" onclick="toggleCard(this)">🔄 Обновление ПО <span>▼</span></button>
                 <div class="args-panel">
-                    <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">
-                        Отправить команду на обновление клиентского приложения.
-                    </p>
                     <button class="btn-send" onclick="handleCommand('update')">Запустить обновление</button>
                 </div>
             </div>
 
+            <div class="cmd-card">
+                <button class="btn-toggle" onclick="toggleCard(this)">🔌 Питание <span>▼</span></button>
+                <div class="args-panel">
+                    <button class="btn-send btn-danger" onclick="handleCommand('shutdown')">Выключить компьютер</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="results-panel">
-        <div class="res-header">Лог событий</div>
+        <div class="res-header">Лог событий <button class="btn-clear-log" onclick="clearLog()">Очистить</button></div>
         <div id="results-container"></div>
     </div>
 
 <script>
-    let socket; // Объявляем сокет, но пока не подключаем
-    let selectedIp = null;
+    let socket; 
+    let selectedSid = null;
     let isAll = false;
+    let knownIpDict = {};
+    let dragSourceEl = null; // Для Drag and Drop
 
-    // Функция подключения и авторизации
     function connectToServer() {
-        const tokenInput = document.getElementById('auth-token');
-        const token = tokenInput.value.trim();
-        const errorDiv = document.getElementById('auth-error');
-        const btnLogin = document.getElementById('btn-login');
-
-        if (!token) {
-            errorDiv.innerText = "Пожалуйста, введите токен!";
-            errorDiv.style.display = "block";
-            return;
-        }
-
-        errorDiv.style.display = "none";
-        btnLogin.innerText = "Подключение...";
-        btnLogin.disabled = true;
-
-        // Инициализируем сокет с токеном
+        const token = document.getElementById('auth-token').value.trim();
+        if (!token) return;
+        
         socket = io({ auth: { role: "teacher", token: token } });
 
-        // Успешное подключение
-        socket.on('connect', async () => {
-            document.getElementById('auth-overlay').style.display = 'none'; // Скрываем окно входа
-            
-            // Запрашиваем клиентов после успешной авторизации
-            try {
-                // Если эндпоинт /clients тоже требует токен, возможно придется передать его в заголовках:
-                // fetch('/clients', { headers: { 'Authorization': token } })
-                const res = await fetch('/clients');
-                if(res.ok) {
-                    const ips = await res.json();
-                    updateClientList(ips);
-                }
-            } catch (e) { console.error("Ошибка получения клиентов:", e); }
+        socket.on('connect', () => {
+            document.getElementById('auth-overlay').style.display = 'none'; 
+            fetchClients();
         });
 
-        // Ошибка подключения (например, неверный токен)
-        socket.on('connect_error', (err) => {
-            errorDiv.innerText = "Неверный токен или сервер недоступен!";
-            errorDiv.style.display = "block";
-            btnLogin.innerText = "Войти";
-            btnLogin.disabled = false;
-            socket.disconnect(); // Отключаемся, чтобы при следующей попытке создать новое подключение
-        });
-
-        // Навешиваем остальные обработчики
-        socket.on('update_clients', (ips) => updateClientList(ips));
+        socket.on('update_clients', (clientsDict) => updateClientList(clientsDict));
         socket.on('display_result', (data) => updateResultCard(data));
+        socket.on('display_stream_frame', (data) => updateStreamGrid(data));
     }
 
-
-    function openBase64InNewTab(base64Data) {
-        const win = window.open();
-        win.document.write(`
-            <html>
-                <head><title>Full Screenshot</title></head>
-                <body style="margin:0; background: #1a1a1a; display: flex; align-items: center; justify-content: center;">
-                    <img src="data:image/jpeg;base64,${base64Data}" style="max-width: 100%; height: auto; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
-                </body>
-            </html>
-        `);
+    async function fetchClients() {
+        try {
+            const res = await fetch('/clients');
+            if(res.ok) updateClientList(await res.json());
+        } catch (e) { console.error(e); }
     }
 
-    function updateClientList(ips) {
+    function updateClientList(clientsDict) {
+        knownIpDict = clientsDict;
         const list = document.getElementById('ip-list');
-        const countSpan = document.getElementById('count');
-        if (!list) return;
-
-        const cleanIps = [...new Set(ips)];
-
         list.innerHTML = '';
-        cleanIps.forEach(ip => {
+        Object.entries(clientsDict).forEach(([sid, ip]) => {
+            if (socket && sid === socket.id) return;
             const div = document.createElement('div');
-            div.className = `ip-item ${selectedIp === ip ? 'selected' : ''}`;
-            div.innerText = ip;
+            div.className = `ip-item ${selectedSid === sid ? 'selected' : ''}`;
+            div.innerHTML = `<div>${ip}</div><span class="sid-hint">${sid.substring(0, 8)}...</span>`;
             div.onclick = () => {
-                selectedIp = ip; 
-                isAll = false;
+                selectedSid = sid; isAll = false;
                 document.getElementById('target-display').innerText = `Цель: ${ip}`;
                 document.querySelectorAll('.ip-item').forEach(el => el.classList.remove('selected'));
                 div.classList.add('selected');
             };
             list.appendChild(div);
         });
-        countSpan.innerText = cleanIps.length;
+        document.getElementById('count').innerText = Object.keys(clientsDict).length;
+    }
+
+    // --- ОБНОВЛЕННЫЙ МОНИТОРИНГ ---
+    function updateStreamGrid(data) {
+        const container = document.getElementById('video-monitoring');
+        const id = `stream-${data.sid}`;
+        let streamDiv = document.getElementById(id);
+
+        if (!streamDiv) {
+            streamDiv = document.createElement('div');
+            streamDiv.id = id;
+            streamDiv.className = 'stream-window';
+            streamDiv.draggable = true;
+
+            // Drag & Drop события
+            streamDiv.addEventListener('dragstart', handleDragStart);
+            streamDiv.addEventListener('dragover', handleDragOver);
+            streamDiv.addEventListener('drop', handleDrop);
+            streamDiv.addEventListener('dragend', handleDragEnd);
+
+            streamDiv.innerHTML = `
+                <img class="stream-img" src="" alt="Stream">
+                <div class="stream-meta">
+                    <span>${data.ip || knownIpDict[data.sid] || "..."}</span>
+                    <div class="stream-actions">
+                        <button class="btn-stream-action" onclick="toggleMaximizeStream('${data.sid}', this)">⛶</button>
+                        <button class="btn-stream-action close" onclick="stopSingleStream('${data.sid}')">✕</button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(streamDiv);
+            updateCount();
+        }
+        streamDiv.querySelector('.stream-img').src = `data:image/jpeg;base64,${data.image}`;
+    }
+
+    // Drag & Drop Логика
+    function handleDragStart(e) {
+        dragSourceEl = this;
+        this.classList.add('dragging');
+    }
+    function handleDragOver(e) {
+        e.preventDefault();
+        this.classList.add('over');
+    }
+    function handleDrop(e) {
+        e.preventDefault();
+        if (dragSourceEl !== this) {
+            const container = document.getElementById('video-monitoring');
+            const all = [...container.children];
+            const fromIdx = all.indexOf(dragSourceEl);
+            const toIdx = all.indexOf(this);
+            if (fromIdx < toIdx) this.after(dragSourceEl);
+            else this.before(dragSourceEl);
+        }
+    }
+    function handleDragEnd() {
+        document.querySelectorAll('.stream-window').forEach(el => el.classList.remove('dragging', 'over'));
+    }
+
+    function stopSingleStream(sid) {
+        // 1. Отправляем запрос на конец трансляции
+        socket.emit('send_command', { target: sid, action: 'get_student_stream_stop', args: {} });
+        // 2. Удаляем фрейм
+        const el = document.getElementById(`stream-${sid}`);
+        if (el) el.remove();
+        updateCount();
+    }
+
+    function toggleMaximizeStream(sid, btn) {
+        const el = document.getElementById(`stream-${sid}`);
+        el.classList.toggle('maximized');
+        btn.innerText = el.classList.contains('maximized') ? '🗗' : '⛶';
+    }
+
+    function updateCount() {
+        const c = document.getElementById('video-monitoring').children.length;
+        document.getElementById('monitoring-count').innerText = `Активных окон: ${c}`;
     }
 
     function selectAll() {
-        isAll = true; selectedIp = null;
+        isAll = true; selectedSid = null;
         document.querySelectorAll('.ip-item').forEach(el => el.classList.remove('selected'));
         document.getElementById('target-display').innerText = "Цель: ВСЕ УЧЕНИКИ";
     }
 
-    function toggleCard(btn) {
-        btn.parentElement.classList.toggle('open');
-    }
+    function toggleCard(btn) { btn.parentElement.classList.toggle('open'); }
 
-    // Главная функция отправки
     async function handleCommand(action) {
-        // Проверяем, существует ли сокет и подключен ли он
-        if (!socket || !socket.connected) return alert("Сначала выполните вход!");
-
-        const target = isAll ? "all" : selectedIp;
+        if (!socket || !socket.connected) return alert("Войдите!");
+        const target = isAll ? "all" : selectedSid;
         if (!target) return alert("Выберите цель!");
 
         let args = {};
-
-        if (action === 'lock') {
-            const url = document.getElementById('lock-img').value;
-            args = { image: url.trim() === "" ? "black" : url };
-        } 
-        else if (action === 'show_console') {
-            const isChecked = document.getElementById('console-vis-check').checked;
-            args = { visibility: isChecked }; // Передаст true или false
-        }
-        else if (action === 'message') {
-            args = { title: document.getElementById('msg-title').value, text: document.getElementById('msg-body').value };
-        }
-        else if (action === 'run_app') {
-            args = { path: document.getElementById('run-path').value };
-        }
-        else if (action === 'kill_app') {
-            args = { process: document.getElementById('kill-name').value };
-        }
-        else if (action === 'collect_files') {
-            args = { collection_name: document.getElementById('collect-name').value || "Default" };
-        }
+        if (action === 'lock') args.image = document.getElementById('lock-img').value || "black";
+        else if (action === 'show_console') args.visibility = document.getElementById('console-vis-check').checked;
+        else if (action === 'message') args = { title: document.getElementById('msg-title').value, text: document.getElementById('msg-body').value };
+        else if (action === 'run_app') args.path = document.getElementById('run-path').value;
+        else if (action === 'kill_app') args.process = document.getElementById('kill-name').value;
+        else if (action === 'collect_files') args.collection_name = document.getElementById('collect-name').value || "Default";
         else if (action === 'send_file') {
-            const fileInput = document.getElementById('send-file-input');
-            if (fileInput.files.length === 0) return alert("Выберите файл!");
-            
-            const file = fileInput.files[0];
-            const base64 = await toBase64(file);
-            args = { 
-                file_name: file.name, 
-                file_data: base64.split(',')[1]
-            };
+            const f = document.getElementById('send-file-input').files[0];
+            if (!f) return alert("Файл!");
+            const b64 = await toBase64(f);
+            args = { file_name: f.name, file_data: b64.split(',')[1] };
         }
-        else if (action === 'open_url') {
-            const url = document.getElementById('open-url-input').value;
-            if (!url.startsWith('http')) {
-                return alert("Введите полную ссылку (с http:// или https://)");
-            }
-            args = { url: url.trim() };
-        }
-        else if (action === 'update') {
-            if(!confirm("Вы уверены, что хотите обновить клиент на стороне ученика?")) return;
+        else if (action === 'open_url') args.url = document.getElementById('open-url-input').value;
+
+        // Авто-очистка при остановке
+        if (action === 'get_student_stream_stop' && isAll) {
+            document.getElementById('video-monitoring').innerHTML = '';
+            updateCount();
         }
 
         socket.emit('send_command', { target, action, args });
         createPendingCard(target, action);
     }
 
-    const toBase64 = file => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
+    const toBase64 = f => new Promise((res, rej) => {
+        const r = new FileReader(); r.readAsDataURL(f);
+        r.onload = () => res(r.result); r.onerror = e => rej(e);
     });
 
     function createPendingCard(target, action) {
-        const container = document.getElementById('results-container');
         const id = `pending-${target}-${action}`.replace(/\./g, '-');
         if (document.getElementById(id)) document.getElementById(id).remove();
         const card = document.createElement('div');
         card.id = id; card.className = 'res-card';
-        card.innerHTML = `
-            <div class="res-meta">${target} | ${new Date().toLocaleTimeString()}</div>
-            <div style="font-weight:bold">${action.toUpperCase()}</div>
-            <div class="status-text" style="color:#d97706">Ожидание...</div>
-        `;
-        container.prepend(card);
+        card.innerHTML = `<div style="font-weight:bold">${action.toUpperCase()}</div><div class="status-text" style="color:#d97706">Ожидание...</div>`;
+        document.getElementById('results-container').prepend(card);
     }
 
     function updateResultCard(data) {
-        const id = `pending-${data.ip}-${data.action}`.replace(/\./g, '-');
-        let card = document.getElementById(id);
-        
-        if (!card) { 
-            createPendingCard(data.ip, data.action); 
-            card = document.getElementById(id); 
-        }
-
-        card.classList.remove('error', 'success');
-        card.classList.add(data.status === 'error' ? 'error' : 'success');
-        
-        const statusText = card.querySelector('.status-text');
-
-        if (data.action === 'screenshot' && data.result && data.result.length > 500) {
-            statusText.innerHTML = `
-                <div style="margin-bottom: 5px; color: var(--success); font-weight: 600;">Скриншот получен:</div>
-                <img src="data:image/jpeg;base64,${data.result}" 
-                     class="res-img" 
-                     onclick="openBase64InNewTab('${data.result}')" 
-                     title="Нажмите, чтобы открыть в полном размере">`;
-        } else {
-            statusText.innerText = data.result || 'Выполнено';
-            statusText.style.color = data.status === 'error' ? 'var(--danger)' : 'var(--success)';
+        const id = `pending-${data.sid || data.ip}-${data.action}`.replace(/\./g, '-');
+        const card = document.getElementById(id);
+        if (card) {
+            card.classList.add(data.status === 'error' ? 'error' : 'success');
+            card.querySelector('.status-text').innerText = data.result || 'Готово';
         }
     }
+
+    function clearLog() { document.getElementById('results-container').innerHTML = ''; }
 </script>
 </body>
 </html>

@@ -2,6 +2,8 @@ from threading import Thread
 import time
 import base64
 import os
+from datetime import datetime
+import ctypes
 
 from flask import Flask,  render_template, request
 from flask_socketio import SocketIO, emit, join_room
@@ -11,14 +13,43 @@ import cv2
 
 #nuitka --standalone --onefile --include-data-dir=templates=templates server.py
 
+visiblity = True
+
+def toogle_console():
+    global visiblity
+    SW_HIDE = 0
+    SW_SHOW = 5
+    GWL_EXSTYLE = -20
+    WS_EX_TOOLWINDOW = 0x00000080
+    WS_EX_APPWINDOW = 0x00040000
+    visiblity = not visiblity
+    hwnd = ctypes.windll.kernel32.GetConsoleWindow()
+    if hwnd:
+        if visiblity:
+            ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            style &= ~WS_EX_TOOLWINDOW
+            style |= WS_EX_APPWINDOW
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+        else:
+            ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            style |= WS_EX_TOOLWINDOW
+            style &= ~WS_EX_APPWINDOW
+            ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+
 class ServerManager():
     def __init__(self, port):
         self.connections = {}
+        self.logs = []
         self.PORT = port
     
     def get_clients(self):
-        return list(self.connections.values())
+        return self.connections
     
+    def get_logs(self):
+        return self.logs
+
     def pre_execution(self, target, action, args):
         if action == "broadcast_start":
             if target == "all":
@@ -46,6 +77,14 @@ class ServerManager():
         def clients():
             return self.get_clients()
         
+        @self.app.route("/logs")
+        def logs():
+            return self.get_logs()
+
+        @self.app.route("/toogle_console")
+        def t():
+            toogle_console()
+        
     def setup_socket_server(self):
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")
 
@@ -62,7 +101,6 @@ class ServerManager():
 
             elif role == "student":
                 join_room("students")
-                join_room(ip)
                 print(f"student connected from {ip}")
                 self.connections[request.sid] = ip
                 self.socketio.emit("update_clients", self.get_clients())
@@ -78,6 +116,9 @@ class ServerManager():
         @self.socketio.on("send_command")
         def handle_command(data):
             target = data.get("target")
+            data["sender"] = request.sid
+            data["time"] = datetime.now().strftime("%H:%M:%S")
+            self.logs.append(data)
             self.pre_execution(target, data["action"], data["args"])
             if target == "all":
                 emit("execute_command", data, to="students")
@@ -86,7 +127,15 @@ class ServerManager():
 
         @self.socketio.on("client_response")
         def handle_response(response_data):
-            self.socketio.emit("display_result", response_data, to="teachers")
+            sender = response_data["sender"]
+            response_data["time"] = datetime.now().strftime("%H:%M:%S")
+            self.logs.append(response_data)
+            self.socketio.emit("display_result", response_data, to=sender)
+
+        @self.socketio.on("display_stream_frame")
+        def display_stream_frame(data):
+            for listener in data["listeners"]:
+                self.socketio.emit("display_stream_frame", data, to=listener)
 
     def setup(self):
         self.setup_http_server()
@@ -122,6 +171,7 @@ SERVER_MANAGER = ServerManager(5000)
 STREAM_MANAGER = StreamManager(30)
 
 def main():
+    toogle_console()
     SERVER_MANAGER.setup()
     STREAM_MANAGER.start()
     SERVER_MANAGER.run()
