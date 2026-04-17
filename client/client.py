@@ -206,20 +206,20 @@ class ActionRealisations():
 
 class NetworkManager():
     def __init__(self):
-        self.socketio = socketio.Client(reconnection=True, reconnection_attempts=0,reconnection_delay=1, reconnection_delay_max=5)
+        self.socketio = socketio.Client(
+            reconnection=True, 
+            reconnection_attempts=0,
+            reconnection_delay=2, 
+            reconnection_delay_max=10,
+            logger=True,
+            engineio_logger=True
+        )
     def send_response(self, sender, action, result):
         self.socketio.emit("client_response", {"sender": sender, "ip": IP_CONFIGURATION.CLIENT_IP, "action": action, "result": result})
     def send_stream_frame(self, listeners, b64_frame):
         self.socketio.emit("display_stream_frame", {"sid": self.socketio.sid, "ip": IP_CONFIGURATION.CLIENT_IP, "image": b64_frame, "listeners": list(listeners)})
     def connect(self):
-        while not self.socketio.connected:
-            try:
-                print(f"Connection to {IP_CONFIGURATION.SERVER_URL}...")
-                self.socketio.connect(IP_CONFIGURATION.SERVER_URL, auth={"role": "student"})
-                break
-            except Exception as e:
-                print(f"error waiting 5 seconds")
-                time.sleep(5)
+        self.socketio.connect(IP_CONFIGURATION.SERVER_URL, auth={"role": "student"})
     def setup_routes(self):
         @self.socketio.event
         def connect():
@@ -273,12 +273,17 @@ class StreamManager():
         self.listeners = set()
     def worker(self):
         while True:
-            if (len(self.listeners) > 0):
-                screen = pyautogui.screenshot()
-                frame = cv2.cvtColor(np.array(screen), cv2.COLOR_RGB2BGR)
-                _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
-                b64_frame = base64.b64encode(buffer).decode("utf-8")
-                NETWORK_MANAGER.send_stream_frame(self.listeners, b64_frame)
+            try:
+                if (len(self.listeners) > 0):
+                    screen = pyautogui.screenshot()
+                    frame = cv2.cvtColor(np.array(screen), cv2.COLOR_RGB2BGR)
+                    _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                    b64_frame = base64.b64encode(buffer).decode("utf-8")
+                    NETWORK_MANAGER.send_stream_frame(self.listeners, b64_frame)
+            except OSError:
+                print("no screen")
+            except Exception as e:
+                print(f"err: {e}")
             time.sleep(1/self.FPS)
     def subscribe(self, sid):
         self.listeners.add(sid)
@@ -294,7 +299,7 @@ WINDOW_MANAGER = WindowManager()
 ACTION_REALISATIONS = ActionRealisations()
 NETWORK_MANAGER = NetworkManager()
 UTILLITY = Utillity()
-STREAM_MANAGER = StreamManager(30)
+STREAM_MANAGER = StreamManager(5)
 STREAM_MANAGER.start()
 
 def cleanup():
