@@ -1,7 +1,7 @@
 import ctypes
 import logging
 import base64
-import os
+from typing import NamedTuple
 
 class Config:
     def __init__(self):
@@ -19,6 +19,20 @@ class EventBus:
         if event_name in self.listeners:
             for callback in self.listeners[event_name]:
                 callback(*args, **kwargs)
+
+class Request(NamedTuple):
+    task_id: str
+    target: str
+    sender: str
+    action: str
+    args: dict[str, any]
+    sent_at: str
+
+class Response(NamedTuple):
+    task_id: str
+    destination: str
+    status: str
+    result: str
 
 def configure_logging(log_file):
     logging.basicConfig(
@@ -45,3 +59,4 @@ def toogle_console(visiblity):
         ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
 
 BUS = EventBus()
+CONFIG = Config()

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel v2.2</title>
+    <title>Admin Panel - Professional</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         :root {
@@ -13,264 +13,118 @@
         }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
         
-        #auth-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--bg); z-index: 10000;
-            display: flex; justify-content: center; align-items: center;
-        }
-        .auth-box {
-            background: var(--panel); padding: 30px; border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 320px; text-align: center;
-            border: 1px solid var(--border);
-        }
-        .auth-box h3 { margin-top: 0; margin-bottom: 20px; }
-        #auth-error { color: var(--danger); font-size: 0.85rem; margin-top: 10px; display: none; font-weight: 500;}
+        /* Авторизация */
+        #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 10000; display: flex; justify-content: center; align-items: center; }
+        .auth-box { background: var(--panel); padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 320px; text-align: center; border: 1px solid var(--border); }
+        #auth-error { color: var(--danger); font-size: 0.85rem; margin-top: 10px; display: none; }
 
+        /* Сайдбар */
         #sidebar { width: 260px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; }
         .ip-item { padding: 10px; margin: 4px 0; background: var(--hover); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: 0.2s; }
         .ip-item.selected { border-color: var(--primary); background: #eff6ff; font-weight: 600; }
+        .sid-hint { font-size: 0.7rem; color: #94a3b8; display: block; font-family: monospace; }
         .btn-all { background: var(--accent); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; margin-bottom: 15px; font-weight: bold; width: 100%; }
 
+        /* Основная часть */
         #main { flex: 1; padding: 20px; overflow-y: auto; border-right: 1px solid var(--border); }
+        #target-display { margin-top: 0; margin-bottom: 20px; color: var(--text); font-size: 1.2rem; }
+        .commands-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+        .cmd-card { background: var(--panel); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .card-header { padding: 15px; background: #fff; border-bottom: 1px solid var(--border); font-weight: 600; }
+        .card-body { padding: 15px; }
+
+        input, textarea { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; }
+        textarea { resize: vertical; min-height: 80px; }
+        .btn-send { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; width: 100%; font-weight: 600; }
         
-        #monitoring-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        #monitoring-count { font-size: 0.8rem; color: #64748b; font-weight: normal; }
-
-        /* --- ОБНОВЛЕННАЯ СЕТКА (Hyprland style) --- */
-        #video-monitoring { 
-            background: #1e293b; border-radius: 12px; padding: 10px; 
-            margin-bottom: 20px; min-height: 100px; 
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            grid-auto-rows: min-content;
-            gap: 10px;
-            border: 2px solid #334155; box-sizing: border-box;
-        }
-        .stream-window { 
-            background: #000; border-radius: 6px; border: 1px solid #475569; 
-            overflow: hidden; position: relative; aspect-ratio: 16/9;
-            transition: all 0.3s ease;
-            cursor: grab;
-        }
-        .stream-window:active { cursor: grabbing; }
-        .stream-window.dragging { opacity: 0.4; border: 2px dashed var(--accent); }
-        .stream-window.over { border: 2px solid var(--primary); transform: scale(1.02); }
-
-        .stream-img { width: 100%; height: 100%; display: block; background: #000; object-fit: contain; pointer-events: none;}
-        .stream-meta { 
-            position: absolute; bottom: 0; left: 0; width: 100%; 
-            background: rgba(0,0,0,0.7); color: #fff; padding: 4px 8px; 
-            font-size: 0.75rem; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center;
-        }
-        .stream-actions { display: flex; gap: 5px; }
-        
-        .btn-stream-action { 
-            background: rgba(255,255,255,0.2); border: none; color: #fff; 
-            border-radius: 4px; cursor: pointer; padding: 2px 6px; font-size: 0.7rem; 
-            transition: background 0.2s;
-        }
-        .btn-stream-action:hover { background: rgba(255,255,255,0.4); }
-        .btn-stream-action.close:hover { background: rgba(225,29,72,0.8); }
-
-        .stream-window.maximized {
-            position: fixed; top: 5%; left: 5%; width: 90vw; height: 90vh;
-            z-index: 9999; border: 2px solid var(--primary);
-            box-shadow: 0 0 0 100vmax rgba(0,0,0,0.8);
-            display: flex; flex-direction: column; border-radius: 12px;
-        }
-        .stream-window.maximized .stream-img { height: 100%; }
-
-        .commands-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
-        .cmd-card { background: var(--panel); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; height: fit-content; }
-        .btn-toggle { width: 100%; padding: 12px 15px; background: #fff; border: none; text-align: left; cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-        .args-panel { display: none; padding: 15px; background: #fafafa; border-top: 1px solid var(--border); }
-        .cmd-card.open .args-panel { display: block; }
-
-        input, textarea, select { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; box-sizing: border-box; }
-        .btn-send { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: 500; }
-        .btn-danger { background: var(--danger); margin-top: 5px; }
-        
+        /* Логи */
         #results-panel { width: 400px; background: var(--panel); display: flex; flex-direction: column; }
         .res-header { padding: 15px; background: #1e293b; color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-        .btn-clear-log { background: rgba(255,255,255,0.1); border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
-        #results-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .res-card { padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 0.85rem; }
-        .res-card.error { border-left: 4px solid var(--danger); }
-        .res-card.success { border-left: 4px solid var(--success); }
-        .res-img { width: 100%; border-radius: 4px; margin-top: 8px; cursor: pointer; border: 1px solid #ddd; }
-        .file-label { display: block; font-size: 0.75rem; margin-bottom: 5px; color: #64748b; font-weight: 600; }
-        .ip-item .sid-hint { font-size: 0.7rem; color: #94a3b8; display: block; font-family: monospace; }
+        #results-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px; background: #f1f5f9; }
+        .res-card { padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: white; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .res-card.error { border-left: 5px solid var(--danger); }
+        .res-card.success { border-left: 5px solid var(--success); }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
         <div class="auth-box">
-            <h3>🔐 Авторизация</h3>
-            <input type="password" id="auth-token" placeholder="Введите токен..." onkeypress="if(event.key === 'Enter') connectToServer()">
-            <button class="btn-send" onclick="connectToServer()" id="btn-login">Войти</button>
-            <div id="auth-error">Неверный токен или сервер недоступен!</div>
+            <h3>🔐 Admin Login</h3>
+            <input type="password" id="auth-token" placeholder="Введите токен...">
+            <button class="btn-send" onclick="connectToServer()">Войти</button>
+            <div id="auth-error">Доступ запрещен</div>
         </div>
     </div>
 
     <div id="sidebar">
         <h3>💻 Ученики (<span id="count">0</span>)</h3>
-        <button class="btn-all" onclick="selectAll()">📢 Выбрать всех</button>
+        <button class="btn-all" onclick="selectAll()">📢 Всем ученикам</button>
         <div id="ip-list"></div>
     </div>
 
     <div id="main">
-        <h2 id="target-display">Цель не выбрана</h2>
-        
-        <h3 id="monitoring-header">
-            🖥️ Мониторинг экранов
-            <span id="monitoring-count">Активных окон: 0</span>
-        </h3>
-        <div id="video-monitoring"></div>
-
+        <h2 id="target-display">Выберите цель</h2>
         <div class="commands-grid">
             <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">🖥️ Мониторинг (Экран ученика) <span>▼</span></button>
-                <div class="args-panel">
-                    <button class="btn-send" onclick="handleCommand('get_student_stream_start')">Начать трансляцию</button>
-                    <button class="btn-send btn-danger" style="margin-top:8px" onclick="handleCommand('get_student_stream_stop')">Остановить</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">🔒 Блокировка экрана <span>▼</span></button>
-                <div class="args-panel">
-                    <span class="file-label">URL картинки (пусто = черный экран)</span>
-                    <input type="text" id="lock-img" placeholder="http://...">
-                    <button class="btn-send" onclick="handleCommand('lock')">Заблокировать</button>
-                    <button class="btn-send btn-danger" onclick="handleCommand('unlock')">Разблокировать</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">🖥️ Трансляция учителя <span>▼</span></button>
-                <div class="args-panel">
-                    <button class="btn-send" onclick="handleCommand('broadcast_start')">Начать трансляцию</button>
-                    <button class="btn-send btn-danger" onclick="handleCommand('broadcast_stop')">Остановить</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">✉️ Сообщение <span>▼</span></button>
-                <div class="args-panel">
+                <div class="card-header">✉️ Сообщение</div>
+                <div class="card-body">
                     <input type="text" id="msg-title" placeholder="Заголовок">
                     <textarea id="msg-body" placeholder="Текст сообщения..."></textarea>
                     <button class="btn-send" onclick="handleCommand('message')">Отправить</button>
                 </div>
             </div>
-
             <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">🚀 Программы <span>▼</span></button>
-                <div class="args-panel">
-                    <input type="text" id="run-path" placeholder="Путь к файлу или ссылка">
-                    <button class="btn-send" onclick="handleCommand('run_app')">Запустить</button>
-                    <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
-                    <input type="text" id="kill-name" placeholder="Название процесса (chrome.exe)">
-                    <button class="btn-send btn-danger" onclick="handleCommand('kill_app')">Закрыть</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">📁 Раздача файла <span>▼</span></button>
-                <div class="args-panel">
-                    <span class="file-label">Выберите файл для отправки</span>
-                    <input type="file" id="send-file-input">
-                    <button class="btn-send" onclick="handleCommand('send_file')">Отправить файл</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">📥 Сбор работ <span>▼</span></button>
-                <div class="args-panel">
-                    <input type="text" id="collect-name" placeholder="Папка для сохранения">
-                    <button class="btn-send" style="background: #10b981;" onclick="handleCommand('collect_files')">Запросить файлы</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">🌐 Открыть ссылку <span>▼</span></button>
-                <div class="args-panel">
-                    <input type="text" id="open-url-input" placeholder="https://google.com">
-                    <button class="btn-send" onclick="handleCommand('open_url')">Открыть на ПК ученика</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">🖥️ Управление консолью <span>▼</span></button>
-                <div class="args-panel">
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 15px; background: #eee; padding: 8px; border-radius: 4px;">
-                        <input type="checkbox" id="console-vis-check" style="width: auto; margin: 0;"> 
-                        <span style="font-size: 0.9rem; font-weight: 600;">Показать окно (Visibility)</span>
-                    </label>
-                    <button class="btn-send" onclick="handleCommand('show_console')">Отправить команду</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">🔄 Обновление ПО <span>▼</span></button>
-                <div class="args-panel">
-                    <button class="btn-send" onclick="handleCommand('update')">Запустить обновление</button>
-                </div>
-            </div>
-
-            <div class="cmd-card">
-                <button class="btn-toggle" onclick="toggleCard(this)">🔌 Питание <span>▼</span></button>
-                <div class="args-panel">
-                    <button class="btn-send btn-danger" onclick="handleCommand('shutdown')">Выключить компьютер</button>
+                <div class="card-header">🔄 Обновление ПО</div>
+                <div class="card-body">
+                    <p style="font-size: 0.8rem; color: #64748b;">Принудительное обновление клиента</p>
+                    <button class="btn-send" style="background: var(--accent);" onclick="handleCommand('update')">Запустить</button>
                 </div>
             </div>
         </div>
     </div>
 
     <div id="results-panel">
-        <div class="res-header">Лог событий <button class="btn-clear-log" onclick="clearLog()">Очистить</button></div>
+        <div class="res-header">Лог действий <button onclick="document.getElementById('results-container').innerHTML=''" style="font-size: 10px; cursor:pointer;">ОЧИСТИТЬ</button></div>
         <div id="results-container"></div>
     </div>
 
 <script>
-    let socket; 
+    let socket;
     let selectedSid = null;
     let isAll = false;
-    let knownIpDict = {};
-    let dragSourceEl = null; // Для Drag and Drop
+    let clientsMap = {};
+
+    function getTimestamp() { return new Date().toISOString(); }
+    function getShortTime() { return new Date().toLocaleTimeString(); }
 
     function connectToServer() {
-        const token = document.getElementById('auth-token').value.trim();
-        if (!token) return;
-        
-        socket = io({ auth: { role: "teacher", token: token } });
+        const token = document.getElementById('auth-token').value;
+        socket = io({ auth: { role: "teacher", token } });
 
         socket.on('connect', () => {
-            document.getElementById('auth-overlay').style.display = 'none'; 
+            document.getElementById('auth-overlay').style.display = 'none';
             fetchClients();
         });
-
-        socket.on('update_clients', (clientsDict) => updateClientList(clientsDict));
+        socket.on('connect_error', () => document.getElementById('auth-error').style.display = 'block');
+        socket.on('update_clients', (dict) => updateClientList(dict));
         socket.on('display_result', (data) => updateResultCard(data));
-        socket.on('display_stream_frame', (data) => updateStreamGrid(data));
     }
 
     async function fetchClients() {
-        try {
-            const res = await fetch('/clients');
-            if(res.ok) updateClientList(await res.json());
-        } catch (e) { console.error(e); }
+        const res = await fetch('/clients');
+        if(res.ok) updateClientList(await res.json());
     }
 
-    function updateClientList(clientsDict) {
-        knownIpDict = clientsDict;
+    function updateClientList(dict) {
+        clientsMap = dict;
         const list = document.getElementById('ip-list');
         list.innerHTML = '';
-        Object.entries(clientsDict).forEach(([sid, ip]) => {
-            if (socket && sid === socket.id) return;
+        Object.entries(dict).forEach(([sid, ip]) => {
+            if (sid === socket.id) return;
             const div = document.createElement('div');
             div.className = `ip-item ${selectedSid === sid ? 'selected' : ''}`;
-            div.innerHTML = `<div>${ip}</div><span class="sid-hint">${sid.substring(0, 8)}...</span>`;
+            div.innerHTML = `<div>${ip}</div><span class="sid-hint">${sid}</span>`;
             div.onclick = () => {
                 selectedSid = sid; isAll = false;
                 document.getElementById('target-display').innerText = `Цель: ${ip}`;
@@ -279,149 +133,73 @@
             };
             list.appendChild(div);
         });
-        document.getElementById('count').innerText = Object.keys(clientsDict).length;
-    }
-
-    // --- ОБНОВЛЕННЫЙ МОНИТОРИНГ ---
-    function updateStreamGrid(data) {
-        const container = document.getElementById('video-monitoring');
-        const id = `stream-${data.sid}`;
-        let streamDiv = document.getElementById(id);
-
-        if (!streamDiv) {
-            streamDiv = document.createElement('div');
-            streamDiv.id = id;
-            streamDiv.className = 'stream-window';
-            streamDiv.draggable = true;
-
-            // Drag & Drop события
-            streamDiv.addEventListener('dragstart', handleDragStart);
-            streamDiv.addEventListener('dragover', handleDragOver);
-            streamDiv.addEventListener('drop', handleDrop);
-            streamDiv.addEventListener('dragend', handleDragEnd);
-
-            streamDiv.innerHTML = `
-                <img class="stream-img" src="" alt="Stream">
-                <div class="stream-meta">
-                    <span>${data.ip || knownIpDict[data.sid] || "..."}</span>
-                    <div class="stream-actions">
-                        <button class="btn-stream-action" onclick="toggleMaximizeStream('${data.sid}', this)">⛶</button>
-                        <button class="btn-stream-action close" onclick="stopSingleStream('${data.sid}')">✕</button>
-                    </div>
-                </div>
-            `;
-            container.appendChild(streamDiv);
-            updateCount();
-        }
-        streamDiv.querySelector('.stream-img').src = `data:image/jpeg;base64,${data.image}`;
-    }
-
-    // Drag & Drop Логика
-    function handleDragStart(e) {
-        dragSourceEl = this;
-        this.classList.add('dragging');
-    }
-    function handleDragOver(e) {
-        e.preventDefault();
-        this.classList.add('over');
-    }
-    function handleDrop(e) {
-        e.preventDefault();
-        if (dragSourceEl !== this) {
-            const container = document.getElementById('video-monitoring');
-            const all = [...container.children];
-            const fromIdx = all.indexOf(dragSourceEl);
-            const toIdx = all.indexOf(this);
-            if (fromIdx < toIdx) this.after(dragSourceEl);
-            else this.before(dragSourceEl);
-        }
-    }
-    function handleDragEnd() {
-        document.querySelectorAll('.stream-window').forEach(el => el.classList.remove('dragging', 'over'));
-    }
-
-    function stopSingleStream(sid) {
-        // 1. Отправляем запрос на конец трансляции
-        socket.emit('send_command', { target: sid, action: 'get_student_stream_stop', args: {} });
-        // 2. Удаляем фрейм
-        const el = document.getElementById(`stream-${sid}`);
-        if (el) el.remove();
-        updateCount();
-    }
-
-    function toggleMaximizeStream(sid, btn) {
-        const el = document.getElementById(`stream-${sid}`);
-        el.classList.toggle('maximized');
-        btn.innerText = el.classList.contains('maximized') ? '🗗' : '⛶';
-    }
-
-    function updateCount() {
-        const c = document.getElementById('video-monitoring').children.length;
-        document.getElementById('monitoring-count').innerText = `Активных окон: ${c}`;
+        document.getElementById('count').innerText = Object.keys(dict).length;
     }
 
     function selectAll() {
         isAll = true; selectedSid = null;
-        document.querySelectorAll('.ip-item').forEach(el => el.classList.remove('selected'));
         document.getElementById('target-display').innerText = "Цель: ВСЕ УЧЕНИКИ";
+        document.querySelectorAll('.ip-item').forEach(el => el.classList.remove('selected'));
     }
 
-    function toggleCard(btn) { btn.parentElement.classList.toggle('open'); }
+    // Генерируем уникальный ID
+    function genId() { return 'req-' + Math.random().toString(36).substr(2, 9); }
 
-    async function handleCommand(action) {
-        if (!socket || !socket.connected) return alert("Войдите!");
+    function handleCommand(action) {
+        if (!socket?.connected) return alert("Нет связи с сервером");
         const target = isAll ? "all" : selectedSid;
-        if (!target) return alert("Выберите цель!");
+        if (!target) return alert("Выберите ученика!");
+
+        const taskId = genId();
+        const adminSid = socket.id; // Твой SID
+        const timestamp = getTimestamp(); // Время для сервера
 
         let args = {};
-        if (action === 'lock') args.image = document.getElementById('lock-img').value || "black";
-        else if (action === 'show_console') args.visibility = document.getElementById('console-vis-check').checked;
-        else if (action === 'message') args = { title: document.getElementById('msg-title').value, text: document.getElementById('msg-body').value };
-        else if (action === 'run_app') args.path = document.getElementById('run-path').value;
-        else if (action === 'kill_app') args.process = document.getElementById('kill-name').value;
-        else if (action === 'collect_files') args.collection_name = document.getElementById('collect-name').value || "Default";
-        else if (action === 'send_file') {
-            const f = document.getElementById('send-file-input').files[0];
-            if (!f) return alert("Файл!");
-            const b64 = await toBase64(f);
-            args = { file_name: f.name, file_data: b64.split(',')[1] };
-        }
-        else if (action === 'open_url') args.url = document.getElementById('open-url-input').value;
-
-        // Авто-очистка при остановке
-        if (action === 'get_student_stream_stop' && isAll) {
-            document.getElementById('video-monitoring').innerHTML = '';
-            updateCount();
+        if (action === 'message') {
+            args = { title: document.getElementById('msg-title').value, text: document.getElementById('msg-body').value };
         }
 
-        socket.emit('send_command', { target, action, args });
-        createPendingCard(target, action);
+        // --- ТО, ЧТО УХОДИТ НА СЕРВЕР ---
+        const payload = {
+            task_id: taskId,
+            sender: adminSid,   // КТО отправил
+            sent_at: timestamp,    // КОГДА отправил (ISO)
+            target: target,
+            action: action,
+            args: args
+        };
+
+        socket.emit('teacher_request', payload);
+
+        // Визуализация в логе
+        const targetName = isAll ? "ВСЕ" : (clientsMap[target] || target);
+        createLogCard(taskId, action, targetName, adminSid);
     }
 
-    const toBase64 = f => new Promise((res, rej) => {
-        const r = new FileReader(); r.readAsDataURL(f);
-        r.onload = () => res(r.result); r.onerror = e => rej(e);
-    });
-
-    function createPendingCard(target, action) {
-        const id = `pending-${target}-${action}`.replace(/\./g, '-');
-        if (document.getElementById(id)) document.getElementById(id).remove();
+    function createLogCard(taskId, action, target, adminSid) {
         const card = document.createElement('div');
-        card.id = id; card.className = 'res-card';
-        card.innerHTML = `<div style="font-weight:bold">${action.toUpperCase()}</div><div class="status-text" style="color:#d97706">Ожидание...</div>`;
+        card.id = taskId;
+        card.className = 'res-card';
+        card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; font-size: 11px; color: #64748b; margin-bottom: 5px;">
+                <span>${getShortTime()}</span>
+                <span>ID: ${adminSid.substring(0,6)}</span>
+            </div>
+            <div style="font-weight:bold;">${action.toUpperCase()} ➡️ ${target}</div>
+            <div class="status" style="margin-top: 5px; color: #6366f1;">⏳ Ожидание ответа...</div>
+        `;
         document.getElementById('results-container').prepend(card);
     }
 
     function updateResultCard(data) {
-        const id = `pending-${data.sid || data.ip}-${data.action}`.replace(/\./g, '-');
-        const card = document.getElementById(id);
-        if (card) {
-            card.classList.add(data.status === 'error' ? 'error' : 'success');
-            card.querySelector('.status-text').innerText = data.result || 'Готово';
-        }
+        const card = document.getElementById(data.task_id);
+        if (!card) return;
+        const statusEl = card.querySelector('.status');
+        const isError = data.status === 'error';
+        card.classList.add(isError ? 'error' : 'success');
+        statusEl.innerText = data.result || (isError ? '❌ Ошибка' : '✅ Выполнено');
+        statusEl.style.color = isError ? 'var(--danger)' : 'var(--success)';
     }
-
-    function clearLog() { document.getElementById('results-container').innerHTML = ''; }
 </script>
 </body>
 </html>
